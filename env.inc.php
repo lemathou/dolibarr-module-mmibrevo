@@ -1,3 +1,3 @@
 <?php
 
-$modulename = 'MMICRM';
+$modulename = 'MMIBrevo';
