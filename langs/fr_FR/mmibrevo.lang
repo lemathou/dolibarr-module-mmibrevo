@@ -33,6 +33,9 @@ MMIBREVO_MYPARAM1Tooltip = My param 1 tooltip
 MMIBREVO_MYPARAM2=My param 2
 MMIBREVO_MYPARAM2Tooltip=My param 2 tooltip
 
+MMI_BREVO_API_KEY = Clé API Brevo
+MMI_BREVO_API_URL = URL API Brevo
+MMI_BREVO_API_FROM = Expéditeur Brevo
 
 #
 # About page

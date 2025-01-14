@@ -176,6 +176,10 @@ class modMMIBrevo extends DolibarrModules
 
 		// Array to add new pages in new tabs
 		$this->tabs = array();
+		$this->tabs = array(
+			'thirdparty:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_thirdparty.php?id=__ID__',
+			'contact:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_contact.php?id=__ID__',
+			'propal:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_propal.php?id=__ID__');
 		// Example:
 		// $this->tabs[] = array('data'=>'objecttype:+tabname1:Title1:mylangfile@mmibrevo:$user->hasRight('mmibrevo', 'read'):/mmibrevo/mynewtab1.php?id=__ID__');  					// To add a new tab identified by code tabname1
 		// $this->tabs[] = array('data'=>'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@mmibrevo:$user->hasRight('othermodule', 'read'):/mmibrevo/mynewtab2.php?id=__ID__',  	// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
@@ -273,6 +277,14 @@ class modMMIBrevo extends DolibarrModules
 		// Permissions provided by this module
 		$this->rights = array();
 		$r = 0;
+
+		$o = 1;
+		$this->rights[$r][0] = $this->numero . sprintf("%02d", ($o * 10) + 1);
+		$this->rights[$r][1] = 'Send SMS with Brevo';
+		$this->rights[$r][3] = 0;
+		$this->rights[$r][4] = 'send';
+
+		$r++;
 		// Add here entries to declare new permissions
 		/* BEGIN MODULEBUILDER PERMISSIONS */
 		/*
