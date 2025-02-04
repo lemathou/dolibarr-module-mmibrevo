@@ -1,0 +1,265 @@
+<?php
+/* Copyright (C) 2004      Rodolphe Quiedeville <rodolphe@quiedeville.org>
+ * Copyright (C) 2004-2016 Laurent Destailleur  <eldy@users.sourceforge.net>
+ * Copyright (C) 2005-2012 Regis Houssin        <regis.houssin@inodbox.com>
+ * Copyright (C) 2013      Florian Henry		<florian.henry@open-concept.pro>
+ * Copyright (C) 2017      Ferran Marcet       	 <fmarcet@2byte.es>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ *      \file       htdocs/compta/facture/note.php
+ *      \ingroup    facture
+ *      \brief      Fiche de notes sur une facture
+ */
+
+// Load Dolibarr environment
+require_once 'env.inc.php';
+require_once 'main_load.inc.php';
+
+require __DIR__ . '/class/mmi_brevo.class.php';
+
+require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/invoice.lib.php';
+if (isModEnabled('project')) {
+	require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+}
+
+// Load translation files required by the page
+$langs->loadLangs(array('companies', 'bills'));
+$langs->load("sms");
+
+$id = (GETPOST('id', 'int') ? GETPOST('id', 'int') : GETPOST('facid', 'int')); // For backward compatibility
+$ref = GETPOST('ref', 'alpha');
+$socid = GETPOST('socid', 'int');
+$action = GETPOST('action', 'aZ09');
+
+$object = new Facture($db);
+// Load object
+if ($id > 0 || !empty($ref)) {
+	$object->fetch($id, $ref, '', '', (getDolGlobalString('INVOICE_USE_SITUATION') ? $conf->global->INVOICE_USE_SITUATION : 0));
+}
+
+if ($object->id > 0) {
+	$object->fetch_thirdparty();
+	$thirdparty = $object->thirdparty;
+	if (! empty($thirdparty->id)) {
+		$socid = $thirdparty->id;
+	}
+	else {
+		accessforbidden();
+	}
+}
+else {
+	accessforbidden();
+}
+
+// Security check
+if ($user->socid) {
+	accessforbidden();
+}
+
+// Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
+$hookmanager->initHooks(array('invoicesms','sms'));
+
+$result = restrictedArea($user, 'facture', $id, '');
+
+$usercancreate = $user->hasRight("facture", "creer");
+
+
+/*
+ * Actions
+ */
+
+$reshook = $hookmanager->executeHooks('doActions', array(), $object, $action); // Note that $action and $object may have been modified by some hooks
+if ($reshook < 0) {
+	setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
+}
+
+/*******************************************************************
+ * ACTIONS
+ ********************************************************************/
+
+/* Envoi d'un SMS */
+if ($action == 'send' && ! $_POST['cancel']) {
+	$error=0;
+
+	$smsfrom='';
+	if (! empty($_POST["fromsms"])) $smsfrom=GETPOST("fromsms");
+	if (empty($smsfrom)) $smsfrom=GETPOST("fromname");
+	$sendto     = GETPOST("sendto");
+	$receiver   = GETPOST('receiver');
+	$body       = GETPOST('message');
+	$deliveryreceipt= GETPOST("deliveryreceipt");
+	$deferred   = GETPOST('deferred');
+	$priority   = GETPOST('priority');
+	$class      = GETPOST('class');
+	$errors_to  = GETPOST("errorstosms");
+
+	if ($receiver == 'thirdparty') $sendto=$thirdparty->phone;
+	if ((empty($sendto) || ! str_replace('+', '', $sendto)) && (! empty($receiver) && $receiver != '-1')) {
+		$sendto=$thirdparty->contact_get_property($receiver, 'mobile');
+	}
+
+	// Test param
+	if (empty($body)) {
+		setEventMessage($langs->trans("ErrorFieldRequired", $langs->transnoentities("Message")), 'errors');
+		$action='test';
+		$error++;
+	}
+	if (empty($smsfrom) || ! str_replace('+', '', $smsfrom)) {
+		setEventMessage($langs->trans("ErrorFieldRequired", $langs->transnoentities("SmsFrom")), 'errors');
+		$action='test';
+		$error++;
+	}
+	if ((empty($sendto) || ! str_replace('+', '', $sendto)) && (empty($receiver) || $receiver == '-1')) {
+		setEventMessage($langs->trans("ErrorFieldRequired", $langs->transnoentities("SmsTo")), 'errors');
+		$action='test';
+		$error++;
+	}
+
+	if (! $error) {
+		// Make substitutions into message
+		$substitutionarrayfortest=array();
+		complete_substitutions_array($substitutionarrayfortest, $langs);
+		$body=make_substitutions($body, $substitutionarrayfortest);
+
+		$brevo = new mmi_brevo($db);
+		$result = $brevo->sms_send($user, $sendto, $body, ['socid'=>$socid, 'fk_element'=>$object->id, 'elementtype'=>'invoice']);
+
+		if ($result > 0) {
+			setEventMessages($langs->trans("SmsSuccessfulySent", $smsfrom, $sendto), null);
+		} else {
+			setEventMessages($langs->trans("ResultKo").' (sms from'.$smsfrom.' to '.$sendto.')<br>'.$smsfile->error, null, 'errors');
+		}
+
+		$action='';
+	}
+}
+
+
+/*
+ * View
+ */
+
+$form = new Form($db);
+
+$title = $object->ref." - ".$langs->trans('SMS');
+$helpurl = "EN:Customers_Invoices|FR:Factures_Clients|ES:Facturas_a_clientes";
+
+llxHeader('', $title, $helpurl);
+
+$object = new Facture($db);
+$object->fetch($id, $ref);
+
+$object->fetch_thirdparty();
+
+$head = facture_prepare_head($object);
+
+$totalpaid = $object->getSommePaiement();
+
+print dol_get_fiche_head($head, 'tabMMIBrevoSMS', $langs->trans("InvoiceCustomer"), -1, 'bill');
+
+// Invoice content
+
+$linkback = '<a href="'.DOL_URL_ROOT.'/compta/facture/list.php?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
+
+$morehtmlref = '<div class="refidno">';
+// Ref customer
+$morehtmlref .= $form->editfieldkey("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', 0, 1);
+$morehtmlref .= $form->editfieldval("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', null, null, '', 1);
+// Thirdparty
+$morehtmlref .= '<br>'.$object->thirdparty->getNomUrl(1, 'customer');
+// Project
+if (isModEnabled('project')) {
+	$langs->load("projects");
+	$morehtmlref .= '<br>';
+	if (0) {
+		$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"');
+		if ($action != 'classify') {
+			$morehtmlref .= '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=classify&token='.newToken().'&id='.$object->id.'">'.img_edit($langs->transnoentitiesnoconv('SetProject')).'</a> ';
+		}
+		$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $object->socid, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
+	} else {
+		if (!empty($object->fk_project)) {
+			$proj = new Project($db);
+			$proj->fetch($object->fk_project);
+			$morehtmlref .= $proj->getNomUrl(1);
+			if ($proj->title) {
+				$morehtmlref .= '<span class="opacitymedium"> - '.dol_escape_htmltag($proj->title).'</span>';
+			}
+		}
+	}
+}
+$morehtmlref .= '</div>';
+
+$object->totalpaid = $totalpaid; // To give a chance to dol_banner_tab to use already paid amount to show correct status
+
+dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0);
+
+print '<div class="fichecenter">';
+print '<div class="underbanner clearboth"></div>';
+
+
+print_fiche_titre($langs->trans("Sms"), '', 'phone.png@mmibrevo');
+
+print "<form method=\"POST\" name=\"smsform\" enctype=\"multipart/form-data\" action=\"".$_SERVER["PHP_SELF"].'?id='.$object->id."\">\n";
+if ((float) DOL_VERSION >= 11.0) {
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+} else {
+	print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
+}
+
+// Cree l'objet formulaire mail
+include_once DOL_DOCUMENT_ROOT.'/core/class/html.formsms.class.php';
+$formsms = new FormSms($db);
+$formsms->fromtype = 'user';
+$formsms->fromid   = $user->id;
+$formsms->fromname = $user->getFullName($langs);
+$formsms->fromsms = $user->user_mobile;
+$formsms->withfrom=1;
+$formsms->withtosocid=$socid;
+$formsms->withfromreadonly=0;
+$formsms->withto=empty($_POST["sendto"])?1:$_POST["sendto"];
+$formsms->withbody=1;
+$formsms->withcancel=0;
+// Tableau des substitutions
+$formsms->substit['__THIRDPARTYREF__']=$thirdparty->ref;
+// Tableau des parametres complementaires du post
+$formsms->param['action']='send';
+$formsms->param['models']='';
+$formsms->param['id']=$thirdparty->id;
+$formsms->param['returnurl']=$_SERVER["PHP_SELF"].'?id='.$object->id;
+
+$formsms->show_form('', 0);
+
+dol_fiche_end();
+
+print '<div class="center">';
+print '<input class="button" type="submit" name="sendmail" value="'.dol_escape_htmltag($langs->trans("SendSms")).'">';
+if ($formsms->withcancel) {
+	print '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
+	print '<input class="button" type="submit" name="cancel" value="'.dol_escape_htmltag($langs->trans("Cancel")).'">';
+}
+print '</div>';
+
+print "</form>\n";
+
+print dol_get_fiche_end();
+
+// End of page
+llxFooter();
+$db->close();

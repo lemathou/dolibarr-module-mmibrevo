@@ -1,7 +1,5 @@
 <?php
-/* Copyright (C) 2011 Laurent Destailleur  <eldy@users.sourceforge.net>
- * Copyright (C) 2010 Jean-Francois FERRY  <jfefe@aternatik.fr>
- * Copyright (C) 2025 Mathieu Moulin       <mathieu@iprospective.fr>
+/* Copyright (C) 2052      Mathieu Moulin <mathieu@iprospective.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -14,49 +12,78 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
 /**
- *   	\file       htdocs/ovh/sms_thirdparty.php
- *		\ingroup    ovh
- *		\brief
+ *  \file       mmibrevo/sms_order.php
+ *  \ingroup    commande
+ *  \brief      Envoi de SMS (via Brevo) depuis une commande
  */
 
+// Load Dolibarr environment
 require_once 'env.inc.php';
 require_once 'main_load.inc.php';
 
-require_once DOL_DOCUMENT_ROOT."/core/lib/company.lib.php";
-require_once DOL_DOCUMENT_ROOT."/societe/class/societe.class.php";
-require_once DOL_DOCUMENT_ROOT."/contact/class/contact.class.php";
-
 require __DIR__ . '/class/mmi_brevo.class.php';
 
-// Load traductions files requiredby by page
-$langs->load("companies");
+require_once DOL_DOCUMENT_ROOT.'/core/lib/order.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+if (isModEnabled('project')) {
+	require_once DOL_DOCUMENT_ROOT.'/projet/class/project.class.php';
+}
+
+// Load translation files required by the page
+$langs->loadLangs(array('companies', 'bills', 'orders'));
 $langs->load("sms");
 
-// Get parameters
-$socid = GETPOST('socid', 'int')?GETPOST('socid', 'int'):GETPOST('id', 'int');
+$id = GETPOST('id', 'int');
+$ref = GETPOST('ref', 'alpha');
+$socid = GETPOST('socid', 'int');
 $action = GETPOST('action', 'aZ09');
-$mesg='';
 
-// Protection if external user
-if ($user->socid > 0) {
+$object = new Commande($db);
+if (!$object->fetch($id, $ref) > 0) {
+	dol_print_error($db);
+	exit;
+}
+
+if ($object->id > 0) {
+	$object->fetch_thirdparty();
+	$thirdparty = $object->thirdparty;
+	if (! empty($thirdparty->id)) {
+		$socid = $thirdparty->id;
+	}
+	else {
+		accessforbidden();
+	}
+}
+else {
 	accessforbidden();
 }
 
-if (! $socid) {
+// Security check
+if ($user->socid) {
 	accessforbidden();
 }
 
-$object = new Societe($db);
-$result = $object->fetch($socid);
-if (! $result) {
-	accessforbidden();
-}
+// Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
+$hookmanager->initHooks(array('ordersms','sms'));
 
-$thirdparty = $object;
+$result = restrictedArea($user, 'commande', $id, '');
+
+$usercancreate  =  $user->hasRight("commande", "creer");
+
+
+/*
+ * Actions
+ */
+
+$parameters = array();
+$reshook = $hookmanager->executeHooks('doActions', $parameters, $object, $action); // Note that $action and $object may have been modified by some hooks
+if ($reshook < 0) {
+	setEventMessages($hookmanager->error, $hookmanager->errors, 'errors');
+}
 
 /*******************************************************************
  * ACTIONS
@@ -101,25 +128,13 @@ if ($action == 'send' && ! $_POST['cancel']) {
 	}
 
 	if (! $error) {
-		/*$actionmsg2 = $langs->transnoentities('SMSSentBy').' '.$smsfrom;
-		if ($body)
-		{
-			$actionmsg = $langs->transnoentities('SMSFrom').': '.dol_escape_htmltag($smsfrom);
-			$actionmsg = dol_concatdesc($actionmsg, $langs->transnoentities('To').': '.dol_escape_htmltag($sendto));
-			$actionmsg = dol_concatdesc($actionmsg, $langs->transnoentities('TextUsedInTheMessageBody').":");
-			$actionmsg = dol_concatdesc($actionmsg, $body);
-		}
-
-		$triggersendname = 'SMS_SENT';*/
-
 		// Make substitutions into message
 		$substitutionarrayfortest=array();
 		complete_substitutions_array($substitutionarrayfortest, $langs);
 		$body=make_substitutions($body, $substitutionarrayfortest);
 
-
 		$brevo = new mmi_brevo($db);
-		$result = $brevo->sms_send($user, $sendto, $body, ['socid'=>$socid]);
+		$result = $brevo->sms_send($user, $sendto, $body, ['socid'=>$socid, 'fk_element'=>$object->id, 'elementtype'=>'order']);
 
 		if ($result > 0) {
 			setEventMessages($langs->trans("SmsSuccessfulySent", $smsfrom, $sendto), null);
@@ -132,37 +147,60 @@ if ($action == 'send' && ! $_POST['cancel']) {
 }
 
 
-
-
-/***************************************************
+/*
  * View
- ****************************************************/
-
-$error=0;
-
-$title = $object->name." - ".$langs->trans('SMS');
-$help_url = 'EN:Commercial_Proposals|FR:Proposition_commerciale|ES:Presupuestos';
-
+ */
+$title = $object->ref." - ".$langs->trans('SMS');
+$help_url = 'EN:Customers_Orders|FR:Commandes_Clients|ES:Pedidos de clientes|DE:Modul_Kundenaufträge';
 llxHeader('', $title, $help_url);
 
-$form=new Form($db);
+$form = new Form($db);
 
-/*
- * Show tabs
- */
-$head = societe_prepare_head($object);
-dol_fiche_head($head, 'tabMMIBrevoSMS', $langs->trans("ThirdParty"), 0, 'company');
+$object->fetch_thirdparty();
 
-if ($mesg) {
-	if (preg_match('/class="error"/', $mesg)) dol_htmloutput_mesg($mesg, '', 'error');
-	else {
-		dol_htmloutput_mesg($mesg, '', 'ok', 1);
-		print '<br>';
+$head = commande_prepare_head($object);
+
+print dol_get_fiche_head($head, 'tabMMIBrevoSMS', $langs->trans("CustomerOrder"), -1, 'order');
+
+// Order card
+
+$linkback = '<a href="'.DOL_URL_ROOT.'/commande/list.php?restore_lastsearch_values=1'.(!empty($socid) ? '&socid='.$socid : '').'">'.$langs->trans("BackToList").'</a>';
+
+
+$morehtmlref = '<div class="refidno">';
+// Ref customer
+$morehtmlref .= $form->editfieldkey("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', 0, 1);
+$morehtmlref .= $form->editfieldval("RefCustomer", 'ref_client', $object->ref_client, $object, 0, 'string', '', null, null, '', 1);
+// Thirdparty
+$morehtmlref .= '<br>'.$object->thirdparty->getNomUrl(1);
+// Project
+if (isModEnabled('project')) {
+	$langs->load("projects");
+	$morehtmlref .= '<br>';
+	if (0) {
+		$morehtmlref .= img_picto($langs->trans("Project"), 'project', 'class="pictofixedwidth"');
+		if ($action != 'classify') {
+			$morehtmlref .= '<a class="editfielda" href="'.$_SERVER['PHP_SELF'].'?action=classify&token='.newToken().'&id='.$object->id.'">'.img_edit($langs->transnoentitiesnoconv('SetProject')).'</a> ';
+		}
+		$morehtmlref .= $form->form_project($_SERVER['PHP_SELF'].'?id='.$object->id, $object->socid, $object->fk_project, ($action == 'classify' ? 'projectid' : 'none'), 0, 0, 0, 1, '', 'maxwidth300');
+	} else {
+		if (!empty($object->fk_project)) {
+			$proj = new Project($db);
+			$proj->fetch($object->fk_project);
+			$morehtmlref .= $proj->getNomUrl(1);
+			if ($proj->title) {
+				$morehtmlref .= '<span class="opacitymedium"> - '.dol_escape_htmltag($proj->title).'</span>';
+			}
+		}
 	}
 }
+$morehtmlref .= '</div>';
 
-dol_banner_tab($object, 'id', '', $user->hasRight('user', 'user', 'lire') || ! empty($user->admin));
 
+dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+
+
+print '<div class="fichecenter">';
 print '<div class="underbanner clearboth"></div>';
 
 print_fiche_titre($langs->trans("Sms"), '', 'phone.png@mmibrevo');
@@ -208,10 +246,11 @@ if ($formsms->withcancel) {
 print '</div>';
 
 print "</form>\n";
+print '</div>';
 
+print dol_get_fiche_end();
 
-
-llxFooter();
 
 // End of page
+llxFooter();
 $db->close();

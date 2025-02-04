@@ -161,8 +161,13 @@ class modMMIBrevo extends DolibarrModules
 		// Example: $this->const=array(1 => array('MMIBREVO_MYNEWCONST1', 'chaine', 'myvalue', 'This is a constant to add', 1),
 		//                             2 => array('MMIBREVO_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
-		$this->const = array();
-
+		$this->const = array(0=>array('MAIN_MODULE_MMIBREVO_SMS','chaine','mmi_brevo_sms@mmibrevo','This is to declare the MMI Brevo SMS module as available',0,'current',1),
+							 1=>array('MAIN_SMS_SENDMODE','chaine','mmi_brevo_sms','This is to autoset the SMS engine to Brevo',0,'current',1),
+							 2=>array('MAIN_SMS_DEBUG','chaine','1','This is to enable SMS debug',1,'allentities',0),
+							 3=>array('MAIN_MENU_ENABLE_MODULETOOLS','chaine','1','To enable module tools entry',0,'allentities',1),
+							 4=>array('MAIN_AGENDA_ACTIONAUTO_COMPANY_SENTBYSMS','chaine','1','To enable module tools entry',0,'allentities',1),
+						     5=>array('MAIN_AGENDA_ACTIONAUTO_MEMBER_SENTBYSMS','chaine','1','To enable module tools entry',0,'allentities',1),
+		);		
 		// Some keys to add into the overwriting translation tables
 		/*$this->overwrite_translation = array(
 			'en_US:ParentCompany'=>'Parent company or reseller',
@@ -179,7 +184,9 @@ class modMMIBrevo extends DolibarrModules
 		$this->tabs = array(
 			'thirdparty:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_thirdparty.php?id=__ID__',
 			'contact:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_contact.php?id=__ID__',
-			'propal:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_propal.php?id=__ID__');
+			'propal:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_propal.php?id=__ID__',
+			'order:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_order.php?id=__ID__',
+			'invoice:+tabMMIBrevoSMS:SMS:mmibrevo@mmibrevo:! empty($user->rights->mmibrevo->send):/mmibrevo/sms_invoice.php?id=__ID__');
 		// Example:
 		// $this->tabs[] = array('data'=>'objecttype:+tabname1:Title1:mylangfile@mmibrevo:$user->hasRight('mmibrevo', 'read'):/mmibrevo/mynewtab1.php?id=__ID__');  					// To add a new tab identified by code tabname1
 		// $this->tabs[] = array('data'=>'objecttype:+tabname2:SUBSTITUTION_Title2:mylangfile@mmibrevo:$user->hasRight('othermodule', 'read'):/mmibrevo/mynewtab2.php?id=__ID__',  	// To add another new tab identified by code tabname2. Label will be result of calling all substitution functions on 'Title2' key.
