@@ -115,10 +115,11 @@ class modMMIBrevo extends DolibarrModules
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			'hooks' => array(
-				//   'data' => array(
-				//       'hookcontext1',
-				//       'hookcontext2',
-				//   ),
+				 'data' => array(
+				       'propalcard',
+				       'ordercard',
+				       'invoicecard',
+				   ),
 				//   'entity' => '0',
 			),
 			// Set this to 1 if features of module are opened to external users
@@ -167,7 +168,7 @@ class modMMIBrevo extends DolibarrModules
 							 3=>array('MAIN_MENU_ENABLE_MODULETOOLS','chaine','1','To enable module tools entry',0,'allentities',1),
 							 4=>array('MAIN_AGENDA_ACTIONAUTO_COMPANY_SENTBYSMS','chaine','1','To enable module tools entry',0,'allentities',1),
 						     5=>array('MAIN_AGENDA_ACTIONAUTO_MEMBER_SENTBYSMS','chaine','1','To enable module tools entry',0,'allentities',1),
-		);		
+		);
 		// Some keys to add into the overwriting translation tables
 		/*$this->overwrite_translation = array(
 			'en_US:ParentCompany'=>'Parent company or reseller',
