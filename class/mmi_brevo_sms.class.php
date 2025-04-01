@@ -172,8 +172,8 @@ class mmi_brevo_sms
 		global $conf;
 
 		$senderlist=array();
-			$senderlist[0] = new stdClass();
-			$senderlist[0]->number = 'MMI';
+		$senderlist[0] = new stdClass();
+		$senderlist[0]->number = getDolGlobalString('MMI_BREVO_API_FROM');
 		return $senderlist;
 	}
 
