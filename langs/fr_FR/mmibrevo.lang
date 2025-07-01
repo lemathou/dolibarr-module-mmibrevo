@@ -26,7 +26,6 @@ ModuleMMIBrevoDesc = Messagerie Email, SMS et Whatsapp par Brevo
 # Admin page
 #
 MMIBrevoSetup = MMIBrevo setup
-Settings = Settings
 MMIBrevoSetupPage = MMIBrevo setup page
 MMIBREVO_MYPARAM1 = My param 1
 MMIBREVO_MYPARAM1Tooltip = My param 1 tooltip
@@ -40,7 +39,6 @@ MMI_BREVO_API_FROM = Expéditeur Brevo
 #
 # About page
 #
-About = About
 MMIBrevoAbout = About MMIBrevo
 MMIBrevoAboutPage = MMIBrevo about page
 
