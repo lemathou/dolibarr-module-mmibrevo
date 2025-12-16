@@ -61,13 +61,13 @@ $formsms->fromname = $user->getFullName($langs);
 $formsms->fromsms = $user->user_mobile;
 $formsms->param['objecttype'] = $object->element;
 $formsms->param['objectid'] = $object->id;
-$formsms->param['models'] = 'body';
+$formsms->param['models'] = $model_body ?'body' :'';
 $formsms->withsubstit=1;
 $formsms->withfrom=1;
 $formsms->withtosocid=$socid;
 $formsms->withfromreadonly=0;
 $formsms->withto=empty($_POST["sendto"])?1:$_POST["sendto"];
-$formsms->withbody=$model_body;
+$formsms->withbody=$model_body ?$model_body :1;
 $formsms->withcancel=0;
 // Tableau des substitutions
 $arrayoffamiliestoexclude = NULL;
