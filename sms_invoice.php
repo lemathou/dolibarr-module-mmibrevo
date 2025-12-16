@@ -213,50 +213,9 @@ dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref, '', 0);
 print '<div class="fichecenter">';
 print '<div class="underbanner clearboth"></div>';
 
+require_once 'sms_form.inc.php';
 
-print_fiche_titre($langs->trans("Sms"), '', 'phone.png@mmibrevo');
-
-print "<form method=\"POST\" name=\"smsform\" enctype=\"multipart/form-data\" action=\"".$_SERVER["PHP_SELF"].'?id='.$object->id."\">\n";
-if ((float) DOL_VERSION >= 11.0) {
-	print '<input type="hidden" name="token" value="'.newToken().'">';
-} else {
-	print '<input type="hidden" name="token" value="'.$_SESSION['newtoken'].'">';
-}
-
-// Cree l'objet formulaire mail
-include_once DOL_DOCUMENT_ROOT.'/core/class/html.formsms.class.php';
-$formsms = new FormSms($db);
-$formsms->fromtype = 'user';
-$formsms->fromid   = $user->id;
-$formsms->fromname = $user->getFullName($langs);
-$formsms->fromsms = $user->user_mobile;
-$formsms->withfrom=1;
-$formsms->withtosocid=$socid;
-$formsms->withfromreadonly=0;
-$formsms->withto=empty($_POST["sendto"])?1:$_POST["sendto"];
-$formsms->withbody=1;
-$formsms->withcancel=0;
-// Tableau des substitutions
-$formsms->substit['__THIRDPARTYREF__']=$thirdparty->ref;
-// Tableau des parametres complementaires du post
-$formsms->param['action']='send';
-$formsms->param['models']='';
-$formsms->param['id']=$thirdparty->id;
-$formsms->param['returnurl']=$_SERVER["PHP_SELF"].'?id='.$object->id;
-
-$formsms->show_form('', 0);
-
-dol_fiche_end();
-
-print '<div class="center">';
-print '<input class="button" type="submit" name="sendmail" value="'.dol_escape_htmltag($langs->trans("SendSms")).'">';
-if ($formsms->withcancel) {
-	print '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;';
-	print '<input class="button" type="submit" name="cancel" value="'.dol_escape_htmltag($langs->trans("Cancel")).'">';
-}
 print '</div>';
-
-print "</form>\n";
 
 print dol_get_fiche_end();
 

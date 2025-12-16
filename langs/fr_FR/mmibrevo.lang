@@ -53,3 +53,6 @@ MyPageName = My page name
 #
 MyWidget = My widget
 MyWidgetDescription = My widget description
+
+SmsTestSubstitutionReplacedByGenericValues = Ce texte contient des variables qui seront remplacées par des valeurs génériques.
+InfoSMSModel = Seuls les templates avec le Sujet "SMS" seront utilisés
